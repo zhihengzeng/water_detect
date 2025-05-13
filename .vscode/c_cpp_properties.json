@@ -1,0 +1,30 @@
+{
+    "configurations": [
+        {
+            "name": "Mac",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "App/**",
+                "Core/Inc/**",
+                "Core/Src/**",
+                "Drivers/CMSIS/Device/ST/STM32F1xx/Include/**",
+                "Drivers/CMSIS/Include/**",
+                "Drivers/STM32F1xx_HAL_Driver/Inc/**",
+                "Drivers/STM32F1xx_HAL_Driver/Inc/Legacy/**",
+                "Drivers/STM32F1xx_HAL_Driver/Src/**"
+            ],
+            "defines": [
+                "USE_HAL_DRIVER",
+                "STM32F103xB"
+            ],
+            "macFrameworkPath": [
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+            ],
+            "compilerPath": "/Users/zhzeng/toolchain/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++11",
+            "intelliSenseMode": "gcc-arm"
+        }
+    ],
+    "version": 4
+}

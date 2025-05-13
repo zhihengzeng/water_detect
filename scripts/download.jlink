@@ -1,0 +1,4 @@
+reset
+loadfile build/water_detect.hex
+r
+qc

@@ -1,0 +1,71 @@
+# STM32CubeIDE项目设置与元数据
+.metadata/
+.settings/
+*.launch
+
+# 构建输出目录
+build/
+debug/
+Debug/
+release/
+Release/
+
+# 目标文件
+*.o
+*.ko
+*.obj
+*.elf
+
+# 链接器输出
+*.ilk
+*.map
+*.exp
+
+# 库文件
+*.lib
+*.a
+*.la
+*.lo
+
+# 共享对象文件
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# 可执行文件
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+*.bin
+
+# 调试文件
+*.dSYM/
+*.su
+*.idb
+*.pdb
+*.lst
+*.d
+
+# MAC系统文件
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# 编辑器/IDE相关文件
+.idea/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/c_cpp_properties.json
+!.vscode/settings.json
+
+# 其他临时文件
+*~
+*.swp
+*.tmp
+*.bak

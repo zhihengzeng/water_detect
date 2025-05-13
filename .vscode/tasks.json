@@ -1,0 +1,97 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "编译",
+			"type": "shell",
+			"command": "make -j8",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": "$gcc"
+		},
+		{
+			"label": "清除编译",
+			"type": "shell",
+			"command": "make clean",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": "$gcc"
+		},
+		{
+			"label": "下载",
+			"type": "shell",
+			"command": "./scripts/run-jlink.sh",
+			"args": [
+				"-device",
+				"STM32F103C8",
+				"-if",
+				"swd",
+				"-speed",
+				"4000",
+				"-CommanderScript",
+				"scripts/download.jlink"
+			],
+			"dependsOn": "编译",
+			"problemMatcher": [
+				"$gcc"
+			]
+		},		
+		{
+			"label": "分析内存",
+			"type": "shell",
+			"command": "python3",
+			"args": [
+				"python/memory_usage.py",
+				"build/water_detect.elf"
+			],
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "new"
+			}
+		},
+		{
+			"label": "串口丢包测试",
+			"type": "shell",
+			"command": "${workspaceFolder}/venv/bin/python3",
+			"args": [
+				"python/uart_test.py",
+				"-p", "/dev/tty.usbserial-2130",
+				"-m", "packet",
+				"-c", "1000",
+				"-i", "0.001"
+			],
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "new"
+			}
+		},
+		{
+			"label": "更新c_cpp_properties.json",
+			"type": "shell",
+			"command": "python3",
+			"args": ["python/update_cpp_properties.py"],
+			"problemMatcher": []
+		},
+		{
+			"label": "字库转换",
+			"type": "shell",
+			"command": "python3",
+			"args": [
+				"python/convert_ziku.py"
+			],
+		},
+	]
+  }
+  
