@@ -124,17 +124,22 @@ void RTC_DisplayTime(RTC_TimeTypeDef *time, uint8_t x, uint8_t y)
 {
     char timeStr[20];
     char dateStr[20];
+    char weekStr[20];
+    
+    // 格式化日期字符串 "20YY-MM-DD"
+    sprintf(dateStr, "Date: 20%02d-%02d-%02d", time->year, time->month, time->day);
     
     // 格式化时间字符串 "HH:MM:SS"
-    sprintf(timeStr, "%02d:%02d:%02d", time->hour, time->minute, time->second);
-    // 格式化日期字符串 "20YY-MM-DD"
-    sprintf(dateStr, "20%02d-%02d-%02d", time->year, time->month, time->day);
+    sprintf(timeStr, "Time: %02d:%02d:%02d", time->hour, time->minute, time->second);
+    
+    // 格式化星期字符串
+    const char *weekDays[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+    sprintf(weekStr, "Week: %s", weekDays[time->week]);
     
     // 在OLED上显示时间和日期
-    OLED_ShowString(x, y, dateStr, 16);         // 显示日期
-    OLED_ShowString(x, y + 2, timeStr, 16);     // 显示时间
-    
-    // 显示星期
-    const char *weekDays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-    OLED_ShowString(x + 72, y + 2, weekDays[time->week], 16);
+    OLED_Clear();  // 清屏，避免叠加显示
+    OLED_ShowString(0, 0, "RTC Clock Demo", 16);  // 标题
+    OLED_ShowString(x, y, dateStr, 16);           // 显示日期
+    OLED_ShowString(x, y + 2, timeStr, 16);       // 显示时间
+    OLED_ShowString(x, y + 4, weekStr, 16);       // 显示星期
 }

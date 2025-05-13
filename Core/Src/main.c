@@ -19,14 +19,18 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "adc.h"
+#include "dma.h"
 #include "i2c.h"
 #include "spi.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "oled.h"
+#include "rtc.h"
+#include "timer.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,7 +51,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+RTC_TimeTypeDef rtcTime;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -90,13 +94,37 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_ADC1_Init();
   MX_I2C1_Init();
   MX_SPI2_Init();
   MX_USART2_UART_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   OLED_Init();
-  OLED_ShowString(0, 0, "Hello World!", 16);
+  OLED_Clear();
+  OLED_ShowString(0, 0, "RTC Clock Demo", 16);
+  
+  // 初始化RTC
+  if (PCF8563_Init() != HAL_OK) {
+    OLED_ShowString(0, 2, "RTC Init Failed!", 16);
+    Error_Handler();
+  }
+  
+  // 如果您希望设置初始时间，可以取消以下注释
+  /*
+  rtcTime.second = 0;
+  rtcTime.minute = 30;
+  rtcTime.hour = 10;
+  rtcTime.day = 20;
+  rtcTime.month = 5;
+  rtcTime.year = 23;
+  rtcTime.week = 6; // 星期六
+  PCF8563_SetTime(&rtcTime);
+  */
+
+  TIMER_Start();
+  
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -106,8 +134,19 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-    HAL_Delay(1000);
+
+    // 1s定时器中断
+    if (timer_1s_flag) {
+      timer_1s_flag = 0;
+      HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+      // 读取RTC时间
+      if (PCF8563_GetTime(&rtcTime) == HAL_OK) {
+        // 显示时间到OLED
+        RTC_DisplayTime(&rtcTime, 0, 2);
+      } else {
+        OLED_ShowString(0, 4, "Read RTC Error!", 16);
+      }
+    }
   }
   /* USER CODE END 3 */
 }
@@ -131,7 +170,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL2;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -146,12 +185,12 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
   PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
-  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV2;
+  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
