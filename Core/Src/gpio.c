@@ -63,11 +63,11 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : COMM4_SAT_Pin WATER_DIN_Pin */
-  GPIO_InitStruct.Pin = COMM4_SAT_Pin|WATER_DIN_Pin;
+  /*Configure GPIO pin : COMM4_SAT_Pin */
+  GPIO_InitStruct.Pin = COMM4_SAT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(COMM4_SAT_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : OLED_DC_Pin OLED_RES_Pin */
   GPIO_InitStruct.Pin = OLED_DC_Pin|OLED_RES_Pin;

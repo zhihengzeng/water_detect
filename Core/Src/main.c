@@ -31,6 +31,7 @@
 #include "oled.h"
 #include "rtc.h"
 #include "timer.h"
+#include "water.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -123,6 +124,8 @@ int main(void)
   PCF8563_SetTime(&rtcTime);
   */
 
+  WATER_Init();
+
   TIMER_Start();
   
   /* USER CODE END 2 */
@@ -135,17 +138,23 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
+    WATER_Process();
+
     // 1s定时器中断
-    if (timer_1s_flag) {
-      timer_1s_flag = 0;
-      HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-      // 读取RTC时间
-      if (PCF8563_GetTime(&rtcTime) == HAL_OK) {
-        // 显示时间到OLED
-        RTC_DisplayTime(&rtcTime, 0, 2);
-      } else {
-        OLED_ShowString(0, 4, "Read RTC Error!", 16);
-      }
+    if (timer_1s_flag)
+    {
+        timer_1s_flag = 0;
+        HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+        
+        // 如果当前是时间页面，则更新时间显示
+        if (WATER_GetCurrentPage() == PAGE_TIME && !WATER_IsPageLocked())
+        {
+            RTC_TimeTypeDef time;
+            if (PCF8563_GetTime(&time) == HAL_OK)
+            {
+                WATER_DisplayTimePage(&time);
+            }
+        }
     }
   }
   /* USER CODE END 3 */

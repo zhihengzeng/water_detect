@@ -175,19 +175,3 @@ void OLED_ShowChinese(uint8_t x, uint8_t y, uint8_t index)
     for(i = 16; i < 32; i++)
         OLED_Write_Data(Hzk[index][i]);
 }
-
-/**
- * @brief 刷新OLED显示
- * @note 将OLED_Buffer中的内容更新到屏幕
- */
-void OLED_Refresh(void)
-{
-    for(uint8_t i = 0; i < 8; i++)
-    {
-        OLED_SetPos(0, i);
-        for(uint8_t j = 0; j < 128; j++)
-        {
-            OLED_Write_Data(OLED_Buffer[j][i]);
-        }
-    }
-}

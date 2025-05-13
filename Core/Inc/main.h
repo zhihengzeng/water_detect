@@ -61,8 +61,6 @@ void Error_Handler(void);
 #define LED_GPIO_Port GPIOC
 #define COMM4_SAT_Pin GPIO_PIN_1
 #define COMM4_SAT_GPIO_Port GPIOA
-#define WATER_DIN_Pin GPIO_PIN_5
-#define WATER_DIN_GPIO_Port GPIOA
 #define OLED_DC_Pin GPIO_PIN_8
 #define OLED_DC_GPIO_Port GPIOB
 #define OLED_RES_Pin GPIO_PIN_9
