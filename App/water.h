@@ -5,6 +5,7 @@
 #include "adc.h"
 #include "oled.h"
 #include "rtc.h"
+#include "flash.h"
 
 // 定义ADC采样缓冲区大小
 #define ADC_BUFFER_SIZE 100
@@ -44,5 +45,8 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc);
 // 添加函数声明
 DisplayPage_TypeDef WATER_GetCurrentPage(void);
 uint8_t WATER_IsPageLocked(void);
+
+// 添加报警功能相关的声明
+void WATER_CheckAlarm(void);
 
 #endif /* __WATER_H */

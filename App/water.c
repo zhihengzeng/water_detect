@@ -83,26 +83,8 @@ void WATER_Process(void)
             }
             else if (current_page == PAGE_WATER)
             {
-                // 更新水位显示（仅更新数值部分）
-                char buffer[16];
-                sprintf(buffer, "%3d%%", water_level);
-                OLED_ShowString(48, 2, buffer, 16);
-                
-                // 水位条形图填充
-                uint8_t bar_length = water_level / 10;
-                memset(buffer, 0, sizeof(buffer));
-                buffer[0] = '[';
-                for (int i = 0; i < 10; i++)
-                {
-                    if (i < bar_length)
-                        buffer[i+1] = '=';
-                    else
-                        buffer[i+1] = ' ';
-                }
-                buffer[11] = ']';
-                buffer[12] = '\0';
-                
-                OLED_ShowString(16, 4, buffer, 16);
+                // 更新整个水位页面而不只是数值
+                WATER_DisplayWaterPage();
             }
         }
         else
@@ -157,13 +139,21 @@ uint8_t WATER_GetLevel(uint16_t adc_value)
 void WATER_DisplayWaterPage(void)
 {
     char buffer[16];
+    uint16_t threshold = FLASH_GetWaterThreshold();
     
     // 显示水位页面标题（居中）
     OLED_ShowString(24, 0, "Water Level", 16);
     
-    // 显示当前水位百分比（居中）
-    sprintf(buffer, "%3d%%", water_level);
-    OLED_ShowString(48, 2, buffer, 16);
+    // 显示当前水位百分比和与阈值的比较关系（居中）
+    if (water_level >= threshold)
+    {
+        sprintf(buffer, "%3d%% >= %3d%%", water_level, threshold);
+    }
+    else
+    {
+        sprintf(buffer, "%3d%% < %3d%%", water_level, threshold);
+    }
+    OLED_ShowString(12, 2, buffer, 16);
     
     // 显示水位条形图边框（居中）
     OLED_ShowString(16, 4, "[          ]", 16);
@@ -183,6 +173,16 @@ void WATER_DisplayWaterPage(void)
     buffer[12] = '\0';
     
     OLED_ShowString(16, 4, buffer, 16);
+    
+    // 如果水位超过阈值，显示报警信息
+    if (water_level >= threshold)
+    {
+        OLED_ShowString(24, 6, "!!! ALARM !!!", 16);
+    }
+    else
+    {
+        OLED_ShowString(24, 6, "            ", 16); // 清除报警信息
+    }
 }
 
 /**

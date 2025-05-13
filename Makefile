@@ -65,6 +65,7 @@ App/oled.c \
 App/rtc.c \
 App/timer.c \
 App/water.c \
+App/flash.c \
 Core/Src/dma.c \
 Core/Src/tim.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_tim.c \

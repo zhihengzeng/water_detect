@@ -32,6 +32,7 @@
 #include "rtc.h"
 #include "timer.h"
 #include "water.h"
+#include "flash.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -105,6 +106,9 @@ int main(void)
   OLED_Init();
   OLED_Clear();
   OLED_ShowString(0, 0, "RTC Clock Demo", 16);
+  
+  // 初始化Flash参数存储
+  FLASH_Init();
   
   // 初始化RTC
   if (PCF8563_Init() != HAL_OK) {
