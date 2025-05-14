@@ -104,16 +104,14 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  SEGGER_RTT_ConfigUpBuffer(0, NULL, NULL, 0, SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL);
-  SEGGER_RTT_printf(0, "hello world\n");
-
-  G4_Init();
   OLED_Init();
-  OLED_Clear();
-  OLED_ShowString(0, 0, "RTC Clock Demo", 16);
-  
-  // 初始化Flash参数存储
-  FLASH_Init();
+  OLED_ShowString(0, 2, "Device Initializing...", 16);
+
+  SEGGER_RTT_ConfigUpBuffer(0, NULL, NULL, 0, SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL);
+
+  TIMER_Start(); // 初始化定时器
+  G4_Init(); // 初始化4G模块
+  FLASH_Init(); // 初始化Flash参数存储
   
   // 初始化RTC
   if (PCF8563_Init() != HAL_OK) {
@@ -133,9 +131,9 @@ int main(void)
   PCF8563_SetTime(&rtcTime);
   */
 
-  WATER_Init();
-
-  TIMER_Start();
+  G4_GetWeather(); // 获取天气数据
+  G4_InitMQTT(1); // 初始化MQTT
+  WATER_Init(); // 初始化水位检测
   
   /* USER CODE END 2 */
 
@@ -147,20 +145,20 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-    // 如果4G已连接且天气数据未更新，获取天气
-    static uint32_t weather_check_time = 0;
-    if (!g4_weather.updated) {
-        uint32_t current_time = TIMER_GetTick();
-        if (current_time - weather_check_time >= 500) {
-            weather_check_time = current_time;
-            G4_GetWeather();
-        }
+    // 如果MQTT未连接但4G已连接，尝试初始化MQTT
+    if (g4_mqtt_state == MQTT_DISCONNECTED) {
+        G4_InitMQTT(0);
+    } 
+    // 定时上传数据
+    else if (g4_upload_flag == 1) {
+      g4_upload_flag = 0;
+      G4_UploadData();
     }
 
-    G4_CheckConnectionStatus();
-
+     // 处理4G数据
     G4_ProcessData();
 
+    // 水位检测ADC
     WATER_Process();
 
     // 1s定时器中断

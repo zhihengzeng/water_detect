@@ -1,5 +1,6 @@
 #include "water.h"
 #include "4G.h"
+#include "timer.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -60,16 +61,39 @@ void WATER_Process(void)
         // 保存上一次水位值用于比较
         previous_water_level = water_level;
         
-        // 计算平均值 (简单滤波)
-        uint32_t sum = 0;
+        // 计算中位数 (中位数滤波)
+        uint16_t temp_buffer[ADC_BUFFER_SIZE];
+        // 复制数据到临时缓冲区
         for (int i = 0; i < ADC_BUFFER_SIZE; i++)
         {
-            sum += adc_buffer[i];
+            temp_buffer[i] = adc_buffer[i];
         }
-        adc_filtered_value = sum / ADC_BUFFER_SIZE;
+
+        // 冒泡排序
+        for (int i = 0; i < ADC_BUFFER_SIZE - 1; i++)
+        {
+            for (int j = 0; j < ADC_BUFFER_SIZE - i - 1; j++)
+            {
+                if (temp_buffer[j] > temp_buffer[j + 1])
+                {
+                    uint16_t temp = temp_buffer[j];
+                    temp_buffer[j] = temp_buffer[j + 1];
+                    temp_buffer[j + 1] = temp;
+                }
+            }
+        }
+
+        // 取中位数
+        adc_filtered_value = temp_buffer[ADC_BUFFER_SIZE / 2];
         
         // 根据ADC值计算水位
         water_level = WATER_GetLevel(adc_filtered_value);
+
+        if (print_adc_value_flag)
+        {
+            // SEGGER_RTT_printf(0, "%d\n", adc_filtered_value);
+            print_adc_value_flag = 0;
+        }
         
         // 检查水位是否变化
         if (water_level != previous_water_level)
@@ -120,16 +144,16 @@ uint8_t WATER_GetLevel(uint16_t adc_value)
 {
     uint8_t ans;
     
-    if (adc_value >= 1750) ans = 100;
-    else if (adc_value >= 1050) ans = 90;
-    else if (adc_value >= 700) ans = 80;
-    else if (adc_value >= 650) ans = 70;
-    else if (adc_value >= 580) ans = 60;
-    else if (adc_value >= 450) ans = 50;
-    else if (adc_value >= 380) ans = 40;
-    else if (adc_value >= 325) ans = 30;
-    else if (adc_value >= 275) ans = 20;
-    else if (adc_value >= 225) ans = 10;
+    if (adc_value >= 2450) ans = 100;
+    else if (adc_value >= 1800) ans = 90;
+    else if (adc_value >= 1150) ans = 80;
+    else if (adc_value >= 830) ans = 70;
+    else if (adc_value >= 600) ans = 60;
+    else if (adc_value >= 500) ans = 50;
+    else if (adc_value >= 430) ans = 40;
+    else if (adc_value >= 380) ans = 30;
+    else if (adc_value >= 320) ans = 20;
+    else if (adc_value >= 270) ans = 10;
     else ans = 0;
     
     return ans;
@@ -209,7 +233,7 @@ void WATER_DisplayWaterPage(void)
     }
     else
     {
-        sprintf(buffer, "%3d%% < %3d%%", water_level, threshold);
+        sprintf(buffer, "%3d%% < %3d%% ", water_level, threshold);
     }
     x_pos = (128 - strlen(buffer) * 8) / 2;
     OLED_ShowString(x_pos, 2, buffer, 16);
@@ -326,4 +350,9 @@ DisplayPage_TypeDef WATER_GetCurrentPage(void)
 uint8_t WATER_IsPageLocked(void)
 {
     return page_lock;
+}
+
+uint8_t WATER_GetCurrentLevel(void)
+{
+    return water_level;
 }

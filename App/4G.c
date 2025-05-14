@@ -1,4 +1,6 @@
 #include "4G.h"
+#include "water.h"
+#include "timer.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -11,11 +13,10 @@ static UART_ReceiveState g4_rx_state = UART_IDLE;
 #define G4_UART &huart2
 #define G4_UART_HANDLE huart2
 
-// 添加全局状态变量
-uint8_t g4_connected = 0;
-
 // 在4G.c顶部添加全局变量
 Weather_TypeDef g4_weather = {0};
+
+MQTT_State g4_mqtt_state = MQTT_DISCONNECTED;
 
 /**
   * @brief  初始化4G模块通信
@@ -37,14 +38,8 @@ void G4_Init(void)
     // 标记天气数据未更新
     g4_weather.updated = 0;
     
-    // 发送初始化命令
-    G4_SendCmd("AT+DTUTASK=\"1\",\"10\"\r\n");
-    HAL_Delay(1000); // 等待响应
-    
-    G4_SendCmd("AT+REST\r\n");
-    HAL_Delay(2000); // 等待模块复位
-    
-    SEGGER_RTT_printf(0, "等待4G模块连接...\n");
+    // 标记MQTT未连接
+    g4_mqtt_state = MQTT_DISCONNECTED;
 }
 
 /**
@@ -104,12 +99,11 @@ void G4_ProcessData(void)
         uint8_t* rx_data = G4_GetRxBuffer();
         uint16_t rx_len = G4_GetDataLength();
         
-        // 使用SEGGER_RTT打印接收数据
-        SEGGER_RTT_printf(0, "receive(%d bytes): %s\n", rx_len, rx_data);
+        SEGGER_RTT_printf(0, "receive(%d bytes): %s\n", rx_len, (char*)rx_data);
         
-        // 尝试解析天气数据
-        if (strstr((char*)rx_data, "\"results\":")) {
-            G4_ParseWeatherJson((char*)rx_data);
+        // 检查是否是MQTT消息
+        if (g4_mqtt_state == MQTT_CONNECTED) {
+            G4_ProcessMQTTData((const char *)rx_data, rx_len);
         }
         
         // 清除缓冲区，准备下一次接收
@@ -173,47 +167,6 @@ void G4_UART_IDLECallback(void)
     }
 }
 
-/**
-  * @brief  检查4G模块连接状态
-  * @retval None
-  */
-void G4_CheckConnectionStatus(void)
-{
-  static uint32_t last_check_time = 0;
-  static uint8_t high_count = 0;
-  uint32_t current_time = TIMER_GetTick();
-  
-  // 每100ms检测一次
-  if (current_time - last_check_time >= 100)
-  {
-    last_check_time = current_time;
-    
-    // 检测COMM4_SAT_GPIO状态
-    if (HAL_GPIO_ReadPin(COMM4_SAT_GPIO_Port, COMM4_SAT_Pin) == GPIO_PIN_SET)
-    {
-      high_count++;
-      if (high_count >= 5)  // 连续5次检测到高电平
-      {
-        if (g4_connected == 0)
-        {
-          SEGGER_RTT_printf(0, "4G connected\n");
-        }
-        g4_connected = 1;
-        high_count = 5;  // 限制计数器最大值
-      }
-    }
-    else
-    {
-      if (g4_connected == 1)
-      {
-        SEGGER_RTT_printf(0, "4G disconnected\n");
-      }
-      high_count = 0;
-      g4_connected = 0;
-    }
-  }
-}
-
 // 修改为阻塞式获取天气函数
 HAL_StatusTypeDef G4_GetWeather(void)
 {  
@@ -222,17 +175,39 @@ HAL_StatusTypeDef G4_GetWeather(void)
     
     // 发送请求前清空状态
     g4_weather.updated = 0;
+
+    // 显示初始化中 
+    OLED_Clear();
+    char title[] = "City Weather";
+    uint8_t title_x = (128 - strlen(title) * 8) / 2;
+    OLED_ShowString(title_x, 2, title, 16);
+    OLED_ShowString(24, 4, "Getting", 16);
+
+    // 发送初始化命令
+    G4_SendCmd("AT+DTUTASK=\"1\",\"10\"\r\n");
+    HAL_Delay(200); // 等待响应
     
-    // 发送请求
-    G4_SendCmd(request);
-    SEGGER_RTT_printf(0, "send weather request\n");
+    G4_SendCmd("AT+REST\r\n");
+    HAL_Delay(200); // 等待模块复位
+
     
-    // 等待接收和解析，设置10秒超时
-    uint32_t start_time = TIMER_GetTick();
-    uint32_t timeout = 10000; // 10秒超时
+    uint32_t retry_count = 0;
+    uint8_t first_time = 1;
+    // 等待接收数据时添加动态效果
+    uint8_t dots = 0, cnt = 0;
+    char dot_text[4] = {0};
     
     while (!g4_weather.updated)
     {
+        // 超时重发
+        if (g4_connected == 1 && (first_time || ++retry_count % 20 == 0)) {
+            retry_count = 0;
+            first_time = 0;
+            // 发送请求
+            G4_SendCmd(request);
+            SEGGER_RTT_printf(0, "send weather request\n");
+        }
+
         // 处理接收到的数据
         if (G4_IsDataReceived())
         {
@@ -240,7 +215,7 @@ HAL_StatusTypeDef G4_GetWeather(void)
             uint8_t* rx_data = G4_GetRxBuffer();
             uint16_t rx_len = G4_GetDataLength();
             
-            SEGGER_RTT_printf(0, "receive(%d bytes)\n", rx_len);
+            SEGGER_RTT_printf(0, "receive(%d bytes): %s\n", rx_len, (char*)rx_data);
             
             // 尝试解析JSON数据
             if (strstr((char*)rx_data, "\"results\":")) {
@@ -252,17 +227,30 @@ HAL_StatusTypeDef G4_GetWeather(void)
             }
             
             // 清除缓冲区，准备继续接收
-            G4_ClearBuffer();
-        }
-        
-        // 检查是否超时
-        if (TIMER_GetTick() - start_time > timeout) {
-            SEGGER_RTT_printf(0, "get weather timeout\n");
-            return HAL_TIMEOUT;
+            // G4_ClearBuffer();
+            g4_rx_state = UART_IDLE;
         }
         
         // 小延时，避免过度占用CPU
-        HAL_Delay(10);
+        HAL_Delay(100);
+
+        // 每200ms更新一次动画
+        if (++cnt >= 2) {
+            cnt = 0;
+            
+            // 更新动态点数量 (0-3)
+            dots = (dots + 1) % 4;
+            
+            // 生成点的文本
+            memset(dot_text, 0, sizeof(dot_text));
+            for (int i = 0; i < dots; i++) {
+                dot_text[i] = '.';
+            }
+            
+            // 更新显示点
+            OLED_ShowString(80, 4, "   ", 16); // 清除之前的点
+            OLED_ShowString(80, 4, dot_text, 16);
+        }
     }
     
     return HAL_OK;
@@ -312,4 +300,143 @@ uint8_t G4_ParseWeatherJson(const char* json_data)
     
     SEGGER_RTT_printf(0, "parse weather data failed\n");
     return 0;
+}
+
+/**
+  * @brief  初始化MQTT连接
+  * @param  force_wait: 是否强制等待连接建立
+  * @retval HAL状态
+  */
+HAL_StatusTypeDef G4_InitMQTT(uint8_t force_wait)
+{   
+    // 设置MQTT模式
+    g4_mqtt_state = MQTT_CONNECTING;
+
+    // 显示初始化中 
+    OLED_Clear();
+    char title[] = "aliyun MQTT";
+    uint8_t title_x = (128 - strlen(title) * 8) / 2;
+    OLED_ShowString(title_x, 2, title, 16);
+    OLED_ShowString(16, 4, "Connecting", 16);
+    
+    // 发送切换到MQTT模式命令
+    G4_SendCmd("AT+DTUTASK=\"1\",\"20\"\r\n");
+    HAL_Delay(200); // 等待响应
+    
+    G4_SendCmd("AT+REST\r\n");
+    HAL_Delay(200); // 等待模块复位
+    
+    SEGGER_RTT_printf(0, "send MQTT initialization command\n");
+    
+    // 等待连接建立，设置30秒超时
+    uint32_t start_time = TIMER_GetTick();
+    uint32_t timeout = 30000; // 30秒超时
+    // 等待接收数据时添加动态效果
+    uint8_t dots = 0, cnt = 0;
+    char dot_text[4] = {0};
+    
+    while (g4_mqtt_state != MQTT_CONNECTED)
+    {
+        // 如果设备已连接，认为MQTT也连接上了
+        if (g4_connected) {
+            g4_mqtt_state = MQTT_CONNECTED;
+            SEGGER_RTT_printf(0, "MQTT connected\n");
+            return HAL_OK;
+        }
+        
+        // 检查是否超时
+        if (!force_wait && TIMER_GetTick() - start_time > timeout) {
+            SEGGER_RTT_printf(0, "MQTT connection timeout\n");
+            g4_mqtt_state = MQTT_DISCONNECTED;
+            return HAL_TIMEOUT;
+        }
+
+        G4_ProcessData();
+        
+        // 小延时，避免过度占用CPU
+        HAL_Delay(100);
+
+        // 每200ms更新一次动画
+        if (++cnt >= 2) {
+            cnt = 0;
+            
+            // 更新动态点数量 (0-3)
+            dots = (dots + 1) % 4;
+            
+            // 生成点的文本
+            memset(dot_text, 0, sizeof(dot_text));
+            for (int i = 0; i < dots; i++) {
+                dot_text[i] = '.';
+            }
+            
+            // 更新显示点
+            OLED_ShowString(94, 4, "   ", 16); // 清除之前的点
+            OLED_ShowString(94, 4, dot_text, 16);
+        }
+    }
+    
+    return HAL_OK;
+}
+
+/**
+  * @brief  上传数据到阿里云
+  * @retval HAL状态
+  */
+HAL_StatusTypeDef G4_UploadData(void)
+{
+    if (g4_mqtt_state != MQTT_CONNECTED) {
+        return HAL_ERROR;
+    }
+    
+    // 构建JSON数据，符合阿里云格式
+    char json_data[256];
+    if (g4_weather.updated) {
+        sprintf(json_data, "{\"params\":{\"water_ratio\":%d,\"water_threshold\":%d,\"city\":\"%s\",\"weather\":\"%s\",\"temperature\":\"%s\"}}",
+                WATER_GetCurrentLevel(),
+                FLASH_GetWaterThreshold(),
+                g4_weather.city,
+                g4_weather.text,
+                g4_weather.temperature);
+    } else {
+            sprintf(json_data, "{\"params\":{\"water_ratio\":%d,\"water_threshold\":%d}}",
+                WATER_GetCurrentLevel(),
+                FLASH_GetWaterThreshold());
+    }
+
+    // 发送JSON数据
+    G4_SendCmd(json_data);
+    SEGGER_RTT_printf(0, "upload data\n");
+    // SEGGER_RTT_printf(0, "upload data: %s\n", json_data);
+}
+
+/**
+  * @brief  处理MQTT接收到的数据
+  * @param  data: 接收到的数据
+  * @param  len: 数据长度
+  * @retval None
+  */
+void G4_ProcessMQTTData(const char* data, uint16_t len)
+{
+    // 检查是否是阿里云的属性设置指令
+    if (strstr(data, "\"method\":\"thing.service.property.set\"")) {
+        // 查找水位阈值设置命令
+        char* threshold_pos = strstr(data, "\"water_threshold\":");
+        if (threshold_pos) {
+            // 提取阈值值
+            threshold_pos += 18; // 跳过 "water_threshold":
+            int new_threshold = atoi(threshold_pos);
+            
+            // 验证阈值范围
+            if (new_threshold > 0 && new_threshold <= 100) {
+                // 更新Flash中的阈值
+                if (FLASH_SetWaterThreshold(new_threshold) == HAL_OK) {
+                    SEGGER_RTT_printf(0, "update water threshold: %d\n", new_threshold);
+                } else {
+                    SEGGER_RTT_printf(0, "update water threshold failed\n");
+                }
+            } else {
+                SEGGER_RTT_printf(0, "invalid water threshold: %d\n", new_threshold);
+            }
+        }
+    }
 }

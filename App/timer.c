@@ -1,6 +1,11 @@
 #include "timer.h"
 #include "gpio.h"
 
+// 添加全局状态变量
+uint8_t g4_connected = 0;
+uint8_t g4_upload_flag = 0;
+uint8_t print_adc_value_flag = 0;
+
 // 1ms中断计数器
 static volatile uint16_t timer_counter_1s = 0;
 // 1s定时标志
@@ -48,13 +53,39 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             timer_1s_flag = 1;
         }
 
+        // 100ms定时器标志
         static uint16_t counter_100ms = 0;
+        static uint8_t high_count = 0;
         counter_100ms++;
         if (counter_100ms >= 100)
         {
             counter_100ms = 0;
-            uint8_t status = HAL_GPIO_ReadPin(COMM4_SAT_GPIO_Port, COMM4_SAT_Pin);
-            
+            // 检测COMM4_SAT_GPIO状态
+            if (HAL_GPIO_ReadPin(COMM4_SAT_GPIO_Port, COMM4_SAT_Pin) == GPIO_PIN_SET) {
+                high_count++;
+                if (high_count >= 5)  // 连续5次检测到高电平
+                {
+                    if (g4_connected == 0) SEGGER_RTT_printf(0, "4G connected\n");
+                    g4_connected = 1;
+                    high_count = 5;  // 限制计数器最大值
+                }
+            }
+            else {
+                if (g4_connected == 1) SEGGER_RTT_printf(0, "4G disconnected\n");
+                high_count = 0;
+                g4_connected = 0;
+            }
+
+            print_adc_value_flag = 1;
+        }
+
+        // 20s定时器标志
+        static uint16_t counter_20s = 0;
+        counter_20s++;
+        if (counter_20s >= 20000)
+        {
+            counter_20s = 0;
+            g4_upload_flag = 1;
         }
     }
 }

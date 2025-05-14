@@ -22,7 +22,15 @@ typedef struct {
     uint8_t updated;    // 数据是否已更新
 } Weather_TypeDef;
 
+// MQTT相关状态
+typedef enum {
+    MQTT_DISCONNECTED,   // 未连接
+    MQTT_CONNECTING,     // 正在连接
+    MQTT_CONNECTED       // 已连接
+} MQTT_State;
+
 extern Weather_TypeDef g4_weather;
+extern MQTT_State g4_mqtt_state;
 
 // 函数声明
 void G4_Init(void);
@@ -33,11 +41,13 @@ void G4_ClearBuffer(void);
 uint16_t G4_GetDataLength(void);
 uint8_t* G4_GetRxBuffer(void);
 
-extern uint8_t g4_connected;  // 全局4G连接状态标志
-void G4_CheckConnectionStatus(void);
-
 // 添加天气相关函数声明
-void G4_GetWeather(void);
+HAL_StatusTypeDef G4_GetWeather(void);
 uint8_t G4_ParseWeatherJson(const char* json_data);
+
+// 添加MQTT相关函数声明
+HAL_StatusTypeDef G4_InitMQTT(uint8_t force_wait);
+HAL_StatusTypeDef G4_UploadData(void);
+void G4_ProcessMQTTData(const char* data, uint16_t len);
 
 #endif /* __4G_H */

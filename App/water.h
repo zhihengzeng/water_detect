@@ -38,6 +38,7 @@ void WATER_DisplayWaterPage(void);
 void WATER_DisplayTimePage(RTC_TimeTypeDef *time);
 void WATER_PageManager(void);
 void WATER_SwitchPage(DisplayPage_TypeDef page);
+uint8_t WATER_GetCurrentLevel(void);
 
 // 回调函数声明
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc);
