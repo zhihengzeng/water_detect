@@ -1,4 +1,5 @@
 #include "water.h"
+#include "4G.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -17,6 +18,8 @@ static uint8_t water_stable_counter = 0; // 水位稳定计数器
 
 // 外部变量引用
 extern volatile uint32_t system_ms; // 系统毫秒计数，假设由定时器中断维护
+extern uint8_t g4_connected;  // 全局4G连接状态标志
+extern Weather_TypeDef g4_weather;  // 全局4G天气数据结构体
 
 /**
   * @brief  初始化水位检测模块
@@ -130,6 +133,49 @@ uint8_t WATER_GetLevel(uint16_t adc_value)
     else ans = 0;
     
     return ans;
+
+}
+
+/**
+  * @brief  显示时间页面
+  * @param  time: RTC时间结构体指针
+  * @retval None
+  */
+void WATER_DisplayTimePage(RTC_TimeTypeDef *time)
+{
+    char buffer[32];
+    uint8_t x_pos;
+    
+    // 第一行：日期（居中）
+    sprintf(buffer, "20%02d-%02d-%02d", time->year, time->month, time->day);
+    x_pos = (128 - strlen(buffer) * 8) / 2;
+    OLED_ShowString(x_pos, 0, buffer, 16);
+    
+    // 第二行：时间 星期缩写（居中）
+    const char* week_days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+    sprintf(buffer, "%02d:%02d:%02d %s", time->hour, time->minute, time->second, week_days[time->week % 7]);
+    x_pos = (128 - strlen(buffer) * 8) / 2;
+    OLED_ShowString(x_pos, 2, buffer, 16);
+    
+    // 第三行：城市（居中）
+    if (g4_weather.updated) {
+        // 已获取天气数据
+        sprintf(buffer, "%s", g4_weather.city);
+        x_pos = (128 - strlen(buffer) * 8) / 2;
+        OLED_ShowString(x_pos, 4, buffer, 16);
+        
+        // 第四行：天气状况 气温（居中）
+        sprintf(buffer, "%s %sC", g4_weather.text, g4_weather.temperature);
+        x_pos = (128 - strlen(buffer) * 8) / 2;
+        OLED_ShowString(x_pos, 6, buffer, 16);
+    } else {
+        // 未获取天气数据
+        strcpy(buffer, "Weather Loading...");
+        x_pos = (128 - strlen(buffer) * 8) / 2;
+        OLED_ShowString(x_pos, 4, buffer, 16);
+        
+        OLED_ShowString(0, 6, "                ", 16); // 清空第四行
+    }
 }
 
 /**
@@ -138,11 +184,23 @@ uint8_t WATER_GetLevel(uint16_t adc_value)
   */
 void WATER_DisplayWaterPage(void)
 {
-    char buffer[16];
+    char buffer[32];
     uint16_t threshold = FLASH_GetWaterThreshold();
+    uint8_t x_pos;
     
-    // 显示水位页面标题（居中）
-    OLED_ShowString(24, 0, "Water Level", 16);
+    // 显示水位页面标题（包含4G状态，居中显示）
+    if (g4_connected)
+    {
+        strcpy(buffer, "Water Level 4G+");
+    }
+    else
+    {
+        strcpy(buffer, "Water Level 4G-");
+    }
+    // 计算居中位置 (128 - 字符数*8) / 2
+    // 16像素字体下ASCII字符宽度为8像素
+    x_pos = (128 - strlen(buffer) * 8) / 2;
+    OLED_ShowString(x_pos, 0, buffer, 16);
     
     // 显示当前水位百分比和与阈值的比较关系（居中）
     if (water_level >= threshold)
@@ -153,10 +211,13 @@ void WATER_DisplayWaterPage(void)
     {
         sprintf(buffer, "%3d%% < %3d%%", water_level, threshold);
     }
-    OLED_ShowString(12, 2, buffer, 16);
+    x_pos = (128 - strlen(buffer) * 8) / 2;
+    OLED_ShowString(x_pos, 2, buffer, 16);
     
     // 显示水位条形图边框（居中）
-    OLED_ShowString(16, 4, "[          ]", 16);
+    strcpy(buffer, "[          ]");
+    x_pos = (128 - strlen(buffer) * 8) / 2;
+    OLED_ShowString(x_pos, 4, buffer, 16);
     
     // 水位条形图填充
     uint8_t bar_length = water_level / 10;
@@ -172,43 +233,20 @@ void WATER_DisplayWaterPage(void)
     buffer[11] = ']';
     buffer[12] = '\0';
     
-    OLED_ShowString(16, 4, buffer, 16);
+    OLED_ShowString(x_pos, 4, buffer, 16);
     
-    // 如果水位超过阈值，显示报警信息
+    // 如果水位超过阈值，显示报警信息（居中）
     if (water_level >= threshold)
     {
-        OLED_ShowString(24, 6, "!!! ALARM !!!", 16);
+        strcpy(buffer, "!!! ALARM !!!");
+        x_pos = (128 - strlen(buffer) * 8) / 2;
+        OLED_ShowString(x_pos, 6, buffer, 16);
     }
     else
     {
-        OLED_ShowString(24, 6, "            ", 16); // 清除报警信息
+        // 清除报警信息行
+        OLED_ShowString(0, 6, "               ", 16);
     }
-}
-
-/**
-  * @brief  显示时间页面
-  * @param  time: RTC时间结构体指针
-  * @retval None
-  */
-void WATER_DisplayTimePage(RTC_TimeTypeDef *time)
-{
-    char buffer[16];
-    
-    // 显示时间页面标题（居中）
-    OLED_ShowString(32, 0, "RTC Time", 16);
-    
-    // 显示日期（居中）
-    sprintf(buffer, "20%02d-%02d-%02d", time->year, time->month, time->day);
-    OLED_ShowString(16, 2, buffer, 16);
-    
-    // 显示时间（居中）
-    sprintf(buffer, "%02d:%02d:%02d", time->hour, time->minute, time->second);
-    OLED_ShowString(32, 4, buffer, 16);
-    
-    // 显示星期（居中）
-    const char* week_days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-    sprintf(buffer, "Week: %s", week_days[time->week % 7]);
-    OLED_ShowString(24, 6, buffer, 16);
 }
 
 /**

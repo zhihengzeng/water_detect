@@ -1,7 +1,8 @@
 #include "timer.h"
+#include "gpio.h"
 
 // 1ms中断计数器
-static volatile uint16_t timer_ms_counter = 0;
+static volatile uint16_t timer_counter_1s = 0;
 // 1s定时标志
 volatile uint8_t timer_1s_flag = 0;
 // 系统毫秒计数器
@@ -39,12 +40,21 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         system_ms++;
         
         // 1s定时器标志
-        static uint16_t ms_counter = 0;
-        ms_counter++;
-        if (ms_counter >= 1000)
+        static uint16_t counter_1s = 0;
+        counter_1s++;
+        if (counter_1s >= 1000)
         {
-            ms_counter = 0;
+            counter_1s = 0;
             timer_1s_flag = 1;
+        }
+
+        static uint16_t counter_100ms = 0;
+        counter_100ms++;
+        if (counter_100ms >= 100)
+        {
+            counter_100ms = 0;
+            uint8_t status = HAL_GPIO_ReadPin(COMM4_SAT_GPIO_Port, COMM4_SAT_Pin);
+            
         }
     }
 }

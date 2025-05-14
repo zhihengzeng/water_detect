@@ -33,6 +33,7 @@
 #include "timer.h"
 #include "water.h"
 #include "flash.h"
+#include "4G.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -103,6 +104,10 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+  SEGGER_RTT_ConfigUpBuffer(0, NULL, NULL, 0, SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL);
+  SEGGER_RTT_printf(0, "hello world\n");
+
+  G4_Init();
   OLED_Init();
   OLED_Clear();
   OLED_ShowString(0, 0, "RTC Clock Demo", 16);
@@ -141,6 +146,20 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+    // 如果4G已连接且天气数据未更新，获取天气
+    static uint32_t weather_check_time = 0;
+    if (!g4_weather.updated) {
+        uint32_t current_time = TIMER_GetTick();
+        if (current_time - weather_check_time >= 500) {
+            weather_check_time = current_time;
+            G4_GetWeather();
+        }
+    }
+
+    G4_CheckConnectionStatus();
+
+    G4_ProcessData();
 
     WATER_Process();
 
